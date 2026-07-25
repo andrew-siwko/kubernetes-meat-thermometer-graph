@@ -84,7 +84,7 @@ in the new public key on `lts.siwko.org`.
 | `PGHOST` / `PGPORT` / `PGDATABASE` | `prod-postgres-rw.default.svc.cluster.local` / `5432` / `sdr433` |
 | `PGUSER` / `PGPASSWORD` | from `sdr433-role-credentials` secret |
 | `MAVERICK_MODEL` / `ACURITE_MODEL` | `Maverick-ET73` / `Acurite-5n1` |
-| `LOOKBACK_HOURS` | `8` |
+| `LOOKBACK_HOURS` | `6` |
 | `GRAPH_MIN_F` / `GRAPH_MAX_F` | `0` / `250` |
 | `MAVERICK_OFFSET_F` | `0` (`-41` in the deployed manifest) |
 | `MAVERICK_RECALIBRATED_AT` | unset (ISO 8601 timestamp, e.g. `2026-07-25T16:14:38+00:00`) |
