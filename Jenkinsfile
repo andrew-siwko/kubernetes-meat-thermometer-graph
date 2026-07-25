@@ -23,6 +23,7 @@ pipeline {
             steps {
                 sh "kubectl apply -f k8s/pvc.yaml"
                 sh "kubectl apply -f k8s/graph-server-deployment.yaml"
+                sh "kubectl apply -f k8s/ssh-known-hosts-configmap.yaml"
                 sh "kubectl apply -f k8s/graph-cronjob.yaml"
                 sh "kubectl rollout restart deployment/meat-thermometer-graph-server"
             }
