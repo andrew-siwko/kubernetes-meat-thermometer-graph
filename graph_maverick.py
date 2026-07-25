@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import subprocess
 
 import matplotlib
 
@@ -18,6 +19,13 @@ LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", 8))
 OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "/output/maverick-temperature.png")
 GRAPH_MIN_F = float(os.environ.get("GRAPH_MIN_F", 0))
 GRAPH_MAX_F = float(os.environ.get("GRAPH_MAX_F", 250))
+
+SCP_HOST = os.environ.get("SCP_HOST", "lts.siwko.org")
+SCP_PORT = os.environ.get("SCP_PORT", "8022")
+SCP_USER = os.environ.get("SCP_USER", "root")
+SCP_PATH = os.environ.get("SCP_PATH", "/var/www/html/maverick-temperature.png")
+SCP_KEY_PATH = os.environ.get("SCP_KEY_PATH", "/secrets/ssh/id_ed25519")
+SCP_KNOWN_HOSTS_PATH = os.environ.get("SCP_KNOWN_HOSTS_PATH", "/secrets/ssh/known_hosts")
 
 QUERY = """
     SELECT timestamp, id, reading
@@ -102,6 +110,23 @@ def plot_series(series):
     return fig
 
 
+def scp_graph():
+    destination = f"{SCP_USER}@{SCP_HOST}:{SCP_PATH}"
+    subprocess.run(
+        [
+            "scp",
+            "-P", SCP_PORT,
+            "-i", SCP_KEY_PATH,
+            "-o", f"UserKnownHostsFile={SCP_KNOWN_HOSTS_PATH}",
+            "-o", "StrictHostKeyChecking=yes",
+            OUTPUT_PATH,
+            destination,
+        ],
+        check=True,
+    )
+    print(f"copied {OUTPUT_PATH} to {destination}", flush=True)
+
+
 def main():
     rows = fetch_readings()
     if not rows:
@@ -118,6 +143,8 @@ def main():
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     fig.savefig(OUTPUT_PATH, facecolor=fig.get_facecolor())
     print(f"wrote {OUTPUT_PATH} from {len(rows)} readings", flush=True)
+
+    scp_graph()
 
 
 if __name__ == "__main__":
