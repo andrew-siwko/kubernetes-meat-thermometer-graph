@@ -29,6 +29,9 @@ GRAPH_MIN_F = float(os.environ.get("GRAPH_MIN_F", 0))
 GRAPH_MAX_F = float(os.environ.get("GRAPH_MAX_F", 250))
 MAVERICK_OFFSET_F = float(os.environ.get("MAVERICK_OFFSET_F", 0))
 MAVERICK_RECALIBRATED_AT = os.environ.get("MAVERICK_RECALIBRATED_AT", "")
+MAVERICK_START_AT = os.environ.get("MAVERICK_START_AT", "")
+MAVERICK_START_TEMP_F = float(os.environ.get("MAVERICK_START_TEMP_F", 200))
+MAVERICK_START_NOTE = os.environ.get("MAVERICK_START_NOTE", "begin smoking")
 OUTDOOR_MIN_F = float(os.environ.get("OUTDOOR_MIN_F", -20))
 OUTDOOR_MAX_F = float(os.environ.get("OUTDOOR_MAX_F", 120))
 WIND_MIN_MPH = float(os.environ.get("WIND_MIN_MPH", 0))
@@ -66,16 +69,17 @@ def kmh_to_mph(kmh):
     return kmh * 0.621371
 
 
-def parse_recalibrated_at():
-    if not MAVERICK_RECALIBRATED_AT:
+def parse_iso_datetime(value):
+    if not value:
         return None
-    recalibrated_at = datetime.datetime.fromisoformat(MAVERICK_RECALIBRATED_AT)
-    if recalibrated_at.tzinfo is None:
-        recalibrated_at = recalibrated_at.replace(tzinfo=datetime.timezone.utc)
-    return recalibrated_at
+    parsed = datetime.datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+    return parsed
 
 
-RECALIBRATED_AT = parse_recalibrated_at()
+RECALIBRATED_AT = parse_iso_datetime(MAVERICK_RECALIBRATED_AT)
+START_AT = parse_iso_datetime(MAVERICK_START_AT)
 
 
 def fetch_readings(model):
@@ -165,6 +169,17 @@ def build_figure(meat, outdoor, wind):
             f"({MAVERICK_OFFSET_F:+.0f}°F offset applied)",
             transform=ax_meat.transAxes, ha="left", va="bottom",
             fontsize=8, style="italic", color="#52514e",
+        )
+    if START_AT is not None:
+        ax_meat.scatter(
+            [START_AT], [MAVERICK_START_TEMP_F],
+            marker=">", s=160, color="#0b0b0b", zorder=6,
+        )
+        ax_meat.annotate(
+            MAVERICK_START_NOTE,
+            xy=(START_AT, MAVERICK_START_TEMP_F),
+            xytext=(8, 8), textcoords="offset points",
+            fontsize=9, fontweight="bold", color="#0b0b0b",
         )
 
     plot_panel(
