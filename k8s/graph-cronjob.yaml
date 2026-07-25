@@ -49,10 +49,37 @@ spec:
               value: "250"
             - name: OUTPUT_PATH
               value: /output/maverick-temperature.png
+            - name: SCP_HOST
+              value: lts.siwko.org
+            - name: SCP_PORT
+              value: "8022"
+            - name: SCP_USER
+              value: root
+            - name: SCP_PATH
+              value: /var/www/html/maverick-temperature.png
+            - name: SCP_KEY_PATH
+              value: /secrets/ssh/id_ed25519
+            - name: SCP_KNOWN_HOSTS_PATH
+              value: /secrets/ssh/known_hosts
             volumeMounts:
             - name: graph-output
               mountPath: /output
+            - name: ssh-key
+              mountPath: /secrets/ssh/id_ed25519
+              subPath: id_ed25519
+              readOnly: true
+            - name: ssh-known-hosts
+              mountPath: /secrets/ssh/known_hosts
+              subPath: known_hosts
+              readOnly: true
           volumes:
           - name: graph-output
             persistentVolumeClaim:
               claimName: meat-thermometer-graph-pvc
+          - name: ssh-key
+            secret:
+              secretName: meat-thermometer-graph-ssh-key
+              defaultMode: 0400
+          - name: ssh-known-hosts
+            configMap:
+              name: meat-thermometer-graph-known-hosts
