@@ -150,7 +150,7 @@ def plot_panel(ax, title, times, values, color, value_fmt, min_value, max_value)
     style_axis(ax)
 
 
-def build_figure(meat, outdoor, wind):
+def build_figure(meat, outdoor, wind, window_start):
     fig, (ax_meat, ax_outdoor, ax_wind) = plt.subplots(
         3, 1, figsize=(10, 11), dpi=150, sharex=True,
     )
@@ -170,7 +170,7 @@ def build_figure(meat, outdoor, wind):
             transform=ax_meat.transAxes, ha="left", va="bottom",
             fontsize=8, style="italic", color="#52514e",
         )
-    if START_AT is not None:
+    if START_AT is not None and START_AT >= window_start:
         ax_meat.scatter(
             [START_AT], [MAVERICK_START_TEMP_F],
             marker=">", s=160, color="#0b0b0b", zorder=6,
@@ -234,7 +234,8 @@ def main():
     outdoor = extract_series(acurite_rows, "temperature_F")
     wind = extract_series(acurite_rows, "wind_avg_km_h", kmh_to_mph)
 
-    fig = build_figure(meat, outdoor, wind)
+    window_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=LOOKBACK_HOURS)
+    fig = build_figure(meat, outdoor, wind, window_start)
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     fig.savefig(OUTPUT_PATH, facecolor=fig.get_facecolor())
