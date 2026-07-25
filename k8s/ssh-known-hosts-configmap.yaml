@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meat-thermometer-graph-known-hosts
+  namespace: default
+data:
+  known_hosts: |
+    [lts.siwko.org]:8022 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHgOrOc0uxDy6NMEjWf6YkvZNu/iBVGFxBw3krVlfP22
