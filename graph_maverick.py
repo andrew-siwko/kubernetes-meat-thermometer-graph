@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import subprocess
+from zoneinfo import ZoneInfo
 
 import matplotlib
 
@@ -13,6 +14,11 @@ from psycopg import connect
 # Connection info (PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD) comes from the
 # environment - psycopg.connect() with no arguments reads the standard libpq
 # env vars automatically.
+
+# all_readings.timestamp is naive but stored as UTC (Postgres server TimeZone
+# is Etc/UTC - see kubernetes-mosquito/update_reading_age.py for the same
+# assumption on this column).
+DISPLAY_TZ = ZoneInfo("America/New_York")
 
 MODEL = os.environ.get("MAVERICK_MODEL", "Maverick-ET73")
 LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", 8))
@@ -28,14 +34,14 @@ SCP_KEY_PATH = os.environ.get("SCP_KEY_PATH", "/secrets/ssh/id_ed25519")
 SCP_KNOWN_HOSTS_PATH = os.environ.get("SCP_KNOWN_HOSTS_PATH", "/secrets/ssh/known_hosts")
 
 QUERY = """
-    SELECT timestamp, id, reading
+    SELECT timestamp, reading
     FROM all_readings
     WHERE model = %s
       AND timestamp >= now() - (%s * interval '1 hour')
     ORDER BY timestamp ASC
 """
 
-SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]  # categorical slots 1-4
+SERIES_COLOR = "#2a78d6"  # categorical slot 1 (blue)
 
 
 def c_to_f(celsius):
@@ -50,9 +56,10 @@ def fetch_readings():
 
 
 def parse_rows(rows):
-    # device id -> (list of timestamps, list of fahrenheit temps)
-    series = {}
-    for timestamp, device_id, reading in rows:
+    # readings for the model, merged across all unit ids
+    times = []
+    temps = []
+    for timestamp, reading in rows:
         try:
             payload = json.loads(reading)
         except json.JSONDecodeError:
@@ -60,49 +67,31 @@ def parse_rows(rows):
 
         if "temperature_1_C" not in payload:
             continue
-        times, temps = series.setdefault(device_id, ([], []))
         times.append(timestamp)
         temps.append(c_to_f(payload["temperature_1_C"]))
 
-    return series
+    return times, temps
 
 
-def find_latest(series):
-    # (device_id, timestamp, fahrenheit) of whichever device has the newest point
-    latest = None
-    for device_id, (times, temps) in series.items():
-        if times and (latest is None or times[-1] > latest[1]):
-            latest = (device_id, times[-1], temps[-1])
-    return latest
-
-
-def plot_series(series):
+def plot_series(times, temps):
     fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
     fig.patch.set_facecolor("#fcfcfb")
     ax.set_facecolor("#fcfcfb")
 
-    multiple_devices = len(series) > 1
-    device_colors = {}
-    for device_index, (device_id, (times, temps)) in enumerate(series.items()):
-        color = SERIES_COLORS[device_index % len(SERIES_COLORS)]
-        device_colors[device_id] = color
-        label = f"id {device_id}" if multiple_devices else None
-        ax.plot(
-            times,
-            temps,
-            color=color,
-            linewidth=2,
-            solid_capstyle="round",
-            label=label,
-        )
+    ax.plot(
+        times,
+        temps,
+        color=SERIES_COLOR,
+        linewidth=2,
+        solid_capstyle="round",
+    )
 
-    latest = find_latest(series)
-    if latest is not None:
-        latest_device, latest_ts, latest_temp = latest
+    if times:
+        latest_ts, latest_temp = times[-1], temps[-1]
         ax.scatter(
             [latest_ts],
             [latest_temp],
-            color=device_colors[latest_device],
+            color=SERIES_COLOR,
             s=36,
             zorder=5,
             edgecolor="#fcfcfb",
@@ -116,9 +105,10 @@ def plot_series(series):
             fontsize=22, fontweight="bold",
             color="#0b0b0b",
         )
+        latest_ts_eastern = latest_ts.replace(tzinfo=datetime.timezone.utc).astimezone(DISPLAY_TZ)
         ax.text(
             0.99, 0.88,
-            f"as of {latest_ts:%Y-%m-%d %H:%M:%S}",
+            f"as of {latest_ts_eastern:%Y-%m-%d %H:%M:%S %Z}",
             transform=ax.transAxes,
             ha="right", va="top",
             fontsize=9,
@@ -144,8 +134,6 @@ def plot_series(series):
         else:
             spine.set_color("#c3c2b7")
 
-    if multiple_devices:
-        ax.legend(frameon=False, labelcolor="#52514e")
     fig.tight_layout()
     return fig
 
@@ -177,8 +165,8 @@ def main():
         )
         return
 
-    series = parse_rows(rows)
-    fig = plot_series(series)
+    times, temps = parse_rows(rows)
+    fig = plot_series(times, temps)
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     fig.savefig(OUTPUT_PATH, facecolor=fig.get_facecolor())

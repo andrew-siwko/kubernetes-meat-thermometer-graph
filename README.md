@@ -9,8 +9,12 @@ the last 8 hours and publishes it as a PNG.
 table for `Maverick-ET73` rows from the last `LOOKBACK_HOURS` (default 8),
 converts probe 1's Celsius reading to Fahrenheit, and renders a line chart
 (fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` y-axis, default 0–250) to `OUTPUT_PATH`
-(default `/output/maverick-temperature.png`). If no readings are found in the
-window, the previous PNG is left in place rather than overwritten.
+(default `/output/maverick-temperature.png`). The most recent reading is called
+out directly on the chart as a current-temperature figure with an "as of"
+timestamp, converted from the database's UTC storage to America/New_York
+(matching the convention in `kubernetes-mosquito/update_reading_age.py`). If no
+readings are found in the window, the previous PNG is left in place rather
+than overwritten.
 
 After a successful write, the PNG is also `scp`'d to `lts.siwko.org:/var/www/html/maverick-temperature.png`.
 
