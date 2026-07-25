@@ -41,12 +41,22 @@ spec:
                   key: password
             - name: MAVERICK_MODEL
               value: Maverick-ET73
+            - name: ACURITE_MODEL
+              value: Acurite-5n1
             - name: LOOKBACK_HOURS
               value: "8"
             - name: GRAPH_MIN_F
               value: "0"
             - name: GRAPH_MAX_F
               value: "250"
+            - name: OUTDOOR_MIN_F
+              value: "-20"
+            - name: OUTDOOR_MAX_F
+              value: "120"
+            - name: WIND_MIN_MPH
+              value: "0"
+            - name: WIND_MAX_MPH
+              value: "40"
             - name: OUTPUT_PATH
               value: /output/maverick-temperature.png
             - name: SCP_HOST

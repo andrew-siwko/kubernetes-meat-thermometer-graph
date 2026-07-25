@@ -20,11 +20,17 @@ from psycopg import connect
 # assumption on this column).
 DISPLAY_TZ = ZoneInfo("America/New_York")
 
-MODEL = os.environ.get("MAVERICK_MODEL", "Maverick-ET73")
+MAVERICK_MODEL = os.environ.get("MAVERICK_MODEL", "Maverick-ET73")
+ACURITE_MODEL = os.environ.get("ACURITE_MODEL", "Acurite-5n1")
 LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", 8))
 OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "/output/maverick-temperature.png")
+
 GRAPH_MIN_F = float(os.environ.get("GRAPH_MIN_F", 0))
 GRAPH_MAX_F = float(os.environ.get("GRAPH_MAX_F", 250))
+OUTDOOR_MIN_F = float(os.environ.get("OUTDOOR_MIN_F", -20))
+OUTDOOR_MAX_F = float(os.environ.get("OUTDOOR_MAX_F", 120))
+WIND_MIN_MPH = float(os.environ.get("WIND_MIN_MPH", 0))
+WIND_MAX_MPH = float(os.environ.get("WIND_MAX_MPH", 40))
 
 SCP_HOST = os.environ.get("SCP_HOST", "lts.siwko.org")
 SCP_PORT = os.environ.get("SCP_PORT", "8022")
@@ -41,100 +47,115 @@ QUERY = """
     ORDER BY timestamp ASC
 """
 
-SERIES_COLOR = "#2a78d6"  # categorical slot 1 (blue)
+COLOR_MEAT = "#2a78d6"  # categorical slot 1 (blue)
+COLOR_OUTDOOR = "#eb6834"  # categorical slot 2 (orange)
+COLOR_WIND = "#1baf7a"  # categorical slot 3 (aqua)
 
 
 def c_to_f(celsius):
     return celsius * 9 / 5 + 32
 
 
-def fetch_readings():
+def kmh_to_mph(kmh):
+    return kmh * 0.621371
+
+
+def fetch_readings(model):
     with connect() as connection:
         with connection.cursor() as cursor:
-            cursor.execute(QUERY, (MODEL, LOOKBACK_HOURS))
+            cursor.execute(QUERY, (model, LOOKBACK_HOURS))
             return cursor.fetchall()
 
 
-def parse_rows(rows):
-    # readings for the model, merged across all unit ids
+def extract_series(rows, field, transform=lambda value: value):
     times = []
-    temps = []
+    values = []
     for timestamp, reading in rows:
         try:
             payload = json.loads(reading)
         except json.JSONDecodeError:
             continue
 
-        if "temperature_1_C" not in payload:
+        if field not in payload:
             continue
         times.append(timestamp)
-        temps.append(c_to_f(payload["temperature_1_C"]))
+        values.append(transform(payload[field]))
 
-    return times, temps
+    return times, values
 
 
-def plot_series(times, temps):
-    fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
-    fig.patch.set_facecolor("#fcfcfb")
+def style_axis(ax):
     ax.set_facecolor("#fcfcfb")
-
-    ax.plot(
-        times,
-        temps,
-        color=SERIES_COLOR,
-        linewidth=2,
-        solid_capstyle="round",
-    )
-
-    if times:
-        latest_ts, latest_temp = times[-1], temps[-1]
-        ax.scatter(
-            [latest_ts],
-            [latest_temp],
-            color=SERIES_COLOR,
-            s=36,
-            zorder=5,
-            edgecolor="#fcfcfb",
-            linewidth=1,
-        )
-        ax.text(
-            0.99, 0.97,
-            f"{latest_temp:.1f}°F",
-            transform=ax.transAxes,
-            ha="right", va="top",
-            fontsize=22, fontweight="bold",
-            color="#0b0b0b",
-        )
-        latest_ts_eastern = latest_ts.replace(tzinfo=datetime.timezone.utc).astimezone(DISPLAY_TZ)
-        ax.text(
-            0.99, 0.88,
-            f"as of {latest_ts_eastern:%Y-%m-%d %H:%M:%S %Z}",
-            transform=ax.transAxes,
-            ha="right", va="top",
-            fontsize=9,
-            color="#52514e",
-        )
-
-    ax.set_title(
-        f"{MODEL} temperature — last {LOOKBACK_HOURS}h",
-        color="#0b0b0b",
-        fontsize=14,
-        loc="left",
-    )
-    ax.set_ylabel("Temperature (°F)", color="#52514e")
-    ax.set_ylim(GRAPH_MIN_F, GRAPH_MAX_F)
-    ax.tick_params(colors="#898781")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    fig.autofmt_xdate()
-
     ax.grid(True, color="#e1e0d9", linewidth=0.8)
+    ax.tick_params(colors="#898781")
     for spine_name, spine in ax.spines.items():
         if spine_name in ("top", "right"):
             spine.set_visible(False)
         else:
             spine.set_color("#c3c2b7")
 
-    fig.tight_layout()
+
+def plot_panel(ax, title, times, values, color, value_fmt, min_value, max_value):
+    ax.plot(times, values, color=color, linewidth=2, solid_capstyle="round")
+
+    if times:
+        latest_ts, latest_value = times[-1], values[-1]
+        ax.scatter(
+            [latest_ts], [latest_value],
+            color=color, s=36, zorder=5,
+            edgecolor="#fcfcfb", linewidth=1,
+        )
+        ax.text(
+            0.99, 0.95, value_fmt.format(latest_value),
+            transform=ax.transAxes, ha="right", va="top",
+            fontsize=18, fontweight="bold", color="#0b0b0b",
+        )
+        latest_ts_eastern = latest_ts.replace(tzinfo=datetime.timezone.utc).astimezone(DISPLAY_TZ)
+        ax.text(
+            0.99, 0.80, f"as of {latest_ts_eastern:%Y-%m-%d %H:%M:%S %Z}",
+            transform=ax.transAxes, ha="right", va="top",
+            fontsize=8, color="#52514e",
+        )
+    else:
+        ax.text(
+            0.5, 0.5, "no data",
+            transform=ax.transAxes, ha="center", va="center",
+            fontsize=10, color="#898781",
+        )
+
+    ax.set_title(title, color="#0b0b0b", fontsize=12, loc="left")
+    ax.set_ylim(min_value, max_value)
+    style_axis(ax)
+
+
+def build_figure(meat, outdoor, wind):
+    fig, (ax_meat, ax_outdoor, ax_wind) = plt.subplots(
+        3, 1, figsize=(10, 11), dpi=150, sharex=True,
+    )
+    fig.patch.set_facecolor("#fcfcfb")
+
+    plot_panel(
+        ax_meat, f"{MAVERICK_MODEL} probe temperature", meat[0], meat[1],
+        COLOR_MEAT, "{:.1f}°F", GRAPH_MIN_F, GRAPH_MAX_F,
+    )
+    ax_meat.set_ylabel("°F", color="#52514e")
+
+    plot_panel(
+        ax_outdoor, f"{ACURITE_MODEL} outdoor temperature", outdoor[0], outdoor[1],
+        COLOR_OUTDOOR, "{:.1f}°F", OUTDOOR_MIN_F, OUTDOOR_MAX_F,
+    )
+    ax_outdoor.set_ylabel("°F", color="#52514e")
+
+    plot_panel(
+        ax_wind, f"{ACURITE_MODEL} wind speed", wind[0], wind[1],
+        COLOR_WIND, "{:.1f} mph", WIND_MIN_MPH, WIND_MAX_MPH,
+    )
+    ax_wind.set_ylabel("mph", color="#52514e")
+    ax_wind.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+
+    fig.autofmt_xdate()
+    fig.suptitle(f"Last {LOOKBACK_HOURS}h", color="#0b0b0b", fontsize=10, x=0.01, ha="left")
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig
 
 
@@ -156,21 +177,30 @@ def scp_graph():
 
 
 def main():
-    rows = fetch_readings()
-    if not rows:
+    maverick_rows = fetch_readings(MAVERICK_MODEL)
+    acurite_rows = fetch_readings(ACURITE_MODEL)
+
+    if not maverick_rows and not acurite_rows:
         print(
-            f"no {MODEL} readings in the last {LOOKBACK_HOURS}h, "
+            f"no {MAVERICK_MODEL} or {ACURITE_MODEL} readings in the last {LOOKBACK_HOURS}h, "
             f"leaving previous graph at {OUTPUT_PATH} in place",
             flush=True,
         )
         return
 
-    times, temps = parse_rows(rows)
-    fig = plot_series(times, temps)
+    meat = extract_series(maverick_rows, "temperature_1_C", c_to_f)
+    outdoor = extract_series(acurite_rows, "temperature_F")
+    wind = extract_series(acurite_rows, "wind_avg_km_h", kmh_to_mph)
+
+    fig = build_figure(meat, outdoor, wind)
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     fig.savefig(OUTPUT_PATH, facecolor=fig.get_facecolor())
-    print(f"wrote {OUTPUT_PATH} from {len(rows)} readings", flush=True)
+    print(
+        f"wrote {OUTPUT_PATH} from {len(maverick_rows)} {MAVERICK_MODEL} "
+        f"and {len(acurite_rows)} {ACURITE_MODEL} readings",
+        flush=True,
+    )
 
     scp_graph()
 

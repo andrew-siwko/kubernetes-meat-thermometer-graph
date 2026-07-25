@@ -1,20 +1,33 @@
 # kubernetes-meat-thermometer-graph
 
-Kubernetes CronJob that graphs Maverick ET-73 meat thermometer temperature over
-the last 8 hours and publishes it as a PNG.
+Kubernetes CronJob that graphs Maverick ET-73 meat thermometer temperature,
+plus outdoor temperature and wind speed from an Acurite-5n1 weather station,
+over the last 8 hours and publishes it as a PNG.
 
 ## What it does
 
 `graph_maverick.py` queries the `sdr433` Postgres database's `all_readings`
-table for `Maverick-ET73` rows from the last `LOOKBACK_HOURS` (default 8),
-converts probe 1's Celsius reading to Fahrenheit, and renders a line chart
-(fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` y-axis, default 0–250) to `OUTPUT_PATH`
-(default `/output/maverick-temperature.png`). The most recent reading is called
-out directly on the chart as a current-temperature figure with an "as of"
-timestamp, converted from the database's UTC storage to America/New_York
-(matching the convention in `kubernetes-mosquito/update_reading_age.py`). If no
-readings are found in the window, the previous PNG is left in place rather
-than overwritten.
+table for `Maverick-ET73` and `Acurite-5n1` rows from the last `LOOKBACK_HOURS`
+(default 8) and renders three stacked panels sharing a time axis — meat probe
+temperature, outdoor temperature, and wind speed — each with its own y-axis
+range, since the three measurements are different quantities on different
+scales (mixing them onto one shared axis would misrepresent the data):
+
+- **Meat probe temperature** — probe 1's Celsius reading converted to
+  Fahrenheit, fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` (default 0–250).
+- **Outdoor temperature** — Acurite-5n1's `temperature_F` field (already
+  Fahrenheit), fixed `OUTDOOR_MIN_F`–`OUTDOOR_MAX_F` (default -20–120).
+- **Wind speed** — Acurite-5n1's `wind_avg_km_h` field converted to mph, fixed
+  `WIND_MIN_MPH`–`WIND_MAX_MPH` (default 0–40).
+
+Each panel calls out its most recent reading directly on the chart with an
+"as of" timestamp, converted from the database's UTC storage to
+America/New_York (matching the convention in
+`kubernetes-mosquito/update_reading_age.py`). The PNG is written to
+`OUTPUT_PATH` (default `/output/maverick-temperature.png`). If neither sensor
+has readings in the window, the previous PNG is left in place rather than
+overwritten; if only one does, that panel still renders and the other shows
+"no data".
 
 After a successful write, the PNG is also `scp`'d to `lts.siwko.org:/var/www/html/maverick-temperature.png`.
 
@@ -64,9 +77,11 @@ in the new public key on `lts.siwko.org`.
 | --- | --- |
 | `PGHOST` / `PGPORT` / `PGDATABASE` | `prod-postgres-rw.default.svc.cluster.local` / `5432` / `sdr433` |
 | `PGUSER` / `PGPASSWORD` | from `sdr433-role-credentials` secret |
-| `MAVERICK_MODEL` | `Maverick-ET73` |
+| `MAVERICK_MODEL` / `ACURITE_MODEL` | `Maverick-ET73` / `Acurite-5n1` |
 | `LOOKBACK_HOURS` | `8` |
 | `GRAPH_MIN_F` / `GRAPH_MAX_F` | `0` / `250` |
+| `OUTDOOR_MIN_F` / `OUTDOOR_MAX_F` | `-20` / `120` |
+| `WIND_MIN_MPH` / `WIND_MAX_MPH` | `0` / `40` |
 | `OUTPUT_PATH` | `/output/maverick-temperature.png` |
 | `SCP_HOST` / `SCP_PORT` / `SCP_USER` | `lts.siwko.org` / `8022` / `root` |
 | `SCP_PATH` | `/var/www/html/maverick-temperature.png` |
