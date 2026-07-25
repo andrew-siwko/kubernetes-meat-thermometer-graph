@@ -16,6 +16,8 @@ from psycopg import connect
 MODEL = os.environ.get("MAVERICK_MODEL", "Maverick-ET73")
 LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", 8))
 OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "/output/maverick-temperature.png")
+GRAPH_MIN_F = float(os.environ.get("GRAPH_MIN_F", 0))
+GRAPH_MAX_F = float(os.environ.get("GRAPH_MAX_F", 250))
 
 QUERY = """
     SELECT timestamp, id, reading
@@ -25,7 +27,7 @@ QUERY = """
     ORDER BY timestamp ASC
 """
 
-SERIES_COLORS = ["#2a78d6", "#eb6834"]  # categorical slots 1 (blue) / 2 (orange)
+SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]  # categorical slots 1-4
 
 
 def c_to_f(celsius):
@@ -40,7 +42,7 @@ def fetch_readings():
 
 
 def parse_rows(rows):
-    # device id -> probe name -> (list of timestamps, list of fahrenheit temps)
+    # device id -> (list of timestamps, list of fahrenheit temps)
     series = {}
     for timestamp, device_id, reading in rows:
         try:
@@ -48,16 +50,11 @@ def parse_rows(rows):
         except json.JSONDecodeError:
             continue
 
-        for probe_key, probe_label in (
-            ("temperature_1_C", "Probe 1"),
-            ("temperature_2_C", "Probe 2"),
-        ):
-            if probe_key not in payload:
-                continue
-            device_series = series.setdefault(device_id, {})
-            times, temps = device_series.setdefault(probe_label, ([], []))
-            times.append(timestamp)
-            temps.append(c_to_f(payload[probe_key]))
+        if "temperature_1_C" not in payload:
+            continue
+        times, temps = series.setdefault(device_id, ([], []))
+        times.append(timestamp)
+        temps.append(c_to_f(payload["temperature_1_C"]))
 
     return series
 
@@ -68,18 +65,17 @@ def plot_series(series):
     ax.set_facecolor("#fcfcfb")
 
     multiple_devices = len(series) > 1
-    for device_id, probes in series.items():
-        for probe_index, (probe_label, (times, temps)) in enumerate(probes.items()):
-            color = SERIES_COLORS[probe_index % len(SERIES_COLORS)]
-            label = f"{probe_label} (id {device_id})" if multiple_devices else probe_label
-            ax.plot(
-                times,
-                temps,
-                color=color,
-                linewidth=2,
-                solid_capstyle="round",
-                label=label,
-            )
+    for device_index, (device_id, (times, temps)) in enumerate(series.items()):
+        color = SERIES_COLORS[device_index % len(SERIES_COLORS)]
+        label = f"id {device_id}" if multiple_devices else None
+        ax.plot(
+            times,
+            temps,
+            color=color,
+            linewidth=2,
+            solid_capstyle="round",
+            label=label,
+        )
 
     ax.set_title(
         f"{MODEL} temperature — last {LOOKBACK_HOURS}h",
@@ -88,6 +84,7 @@ def plot_series(series):
         loc="left",
     )
     ax.set_ylabel("Temperature (°F)", color="#52514e")
+    ax.set_ylim(GRAPH_MIN_F, GRAPH_MAX_F)
     ax.tick_params(colors="#898781")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
     fig.autofmt_xdate()
@@ -99,7 +96,8 @@ def plot_series(series):
         else:
             spine.set_color("#c3c2b7")
 
-    ax.legend(frameon=False, labelcolor="#52514e")
+    if multiple_devices:
+        ax.legend(frameon=False, labelcolor="#52514e")
     fig.tight_layout()
     return fig
 
