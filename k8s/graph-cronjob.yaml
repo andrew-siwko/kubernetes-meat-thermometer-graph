@@ -49,6 +49,10 @@ spec:
               value: "0"
             - name: GRAPH_MAX_F
               value: "250"
+            - name: MAVERICK_OFFSET_F
+              value: "-41"
+            - name: MAVERICK_RECALIBRATED_AT
+              value: "2026-07-25T16:14:38+00:00"
             - name: OUTDOOR_MIN_F
               value: "50"
             - name: OUTDOOR_MAX_F

@@ -27,6 +27,8 @@ OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "/output/maverick-temperature.png")
 
 GRAPH_MIN_F = float(os.environ.get("GRAPH_MIN_F", 0))
 GRAPH_MAX_F = float(os.environ.get("GRAPH_MAX_F", 250))
+MAVERICK_OFFSET_F = float(os.environ.get("MAVERICK_OFFSET_F", 0))
+MAVERICK_RECALIBRATED_AT = os.environ.get("MAVERICK_RECALIBRATED_AT", "")
 OUTDOOR_MIN_F = float(os.environ.get("OUTDOOR_MIN_F", -20))
 OUTDOOR_MAX_F = float(os.environ.get("OUTDOOR_MAX_F", 120))
 WIND_MIN_MPH = float(os.environ.get("WIND_MIN_MPH", 0))
@@ -56,8 +58,24 @@ def c_to_f(celsius):
     return celsius * 9 / 5 + 32
 
 
+def maverick_probe_f(celsius):
+    return c_to_f(celsius) + MAVERICK_OFFSET_F
+
+
 def kmh_to_mph(kmh):
     return kmh * 0.621371
+
+
+def parse_recalibrated_at():
+    if not MAVERICK_RECALIBRATED_AT:
+        return None
+    recalibrated_at = datetime.datetime.fromisoformat(MAVERICK_RECALIBRATED_AT)
+    if recalibrated_at.tzinfo is None:
+        recalibrated_at = recalibrated_at.replace(tzinfo=datetime.timezone.utc)
+    return recalibrated_at
+
+
+RECALIBRATED_AT = parse_recalibrated_at()
 
 
 def fetch_readings(model):
@@ -139,6 +157,15 @@ def build_figure(meat, outdoor, wind):
         COLOR_MEAT, "{:.1f}°F", GRAPH_MIN_F, GRAPH_MAX_F,
     )
     ax_meat.set_ylabel("°F", color="#52514e")
+    if RECALIBRATED_AT is not None:
+        recalibrated_eastern = RECALIBRATED_AT.astimezone(DISPLAY_TZ)
+        ax_meat.text(
+            0.01, 0.03,
+            f"Note: probe recalibrated {recalibrated_eastern:%Y-%m-%d %H:%M %Z} "
+            f"({MAVERICK_OFFSET_F:+.0f}°F offset applied)",
+            transform=ax_meat.transAxes, ha="left", va="bottom",
+            fontsize=8, style="italic", color="#52514e",
+        )
 
     plot_panel(
         ax_outdoor, f"{ACURITE_MODEL} outdoor temperature", outdoor[0], outdoor[1],
@@ -188,7 +215,7 @@ def main():
         )
         return
 
-    meat = extract_series(maverick_rows, "temperature_1_C", c_to_f)
+    meat = extract_series(maverick_rows, "temperature_1_C", maverick_probe_f)
     outdoor = extract_series(acurite_rows, "temperature_F")
     wind = extract_series(acurite_rows, "wind_avg_km_h", kmh_to_mph)
 

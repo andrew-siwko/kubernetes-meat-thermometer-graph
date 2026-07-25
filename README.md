@@ -14,7 +14,13 @@ range, since the three measurements are different quantities on different
 scales (mixing them onto one shared axis would misrepresent the data):
 
 - **Meat probe temperature** — probe 1's Celsius reading converted to
-  Fahrenheit, fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` (default 0–250).
+  Fahrenheit, fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` (default 0–250), plus
+  `MAVERICK_OFFSET_F` (default 0) added on top to correct for sensor drift. The
+  probe currently reads 41°F high, so this is set to `-41` in
+  `k8s/graph-cronjob.yaml`. When `MAVERICK_RECALIBRATED_AT` (an ISO 8601
+  timestamp) is set, the panel shows a small note recording when the
+  correction was applied and its size, converted to America/New_York for
+  display.
 - **Outdoor temperature** — Acurite-5n1's `temperature_F` field (already
   Fahrenheit), fixed `OUTDOOR_MIN_F`–`OUTDOOR_MAX_F` (default -20–120).
 - **Wind speed** — Acurite-5n1's `wind_avg_km_h` field converted to mph, fixed
@@ -80,6 +86,8 @@ in the new public key on `lts.siwko.org`.
 | `MAVERICK_MODEL` / `ACURITE_MODEL` | `Maverick-ET73` / `Acurite-5n1` |
 | `LOOKBACK_HOURS` | `8` |
 | `GRAPH_MIN_F` / `GRAPH_MAX_F` | `0` / `250` |
+| `MAVERICK_OFFSET_F` | `0` (`-41` in the deployed manifest) |
+| `MAVERICK_RECALIBRATED_AT` | unset (ISO 8601 timestamp, e.g. `2026-07-25T16:14:38+00:00`) |
 | `OUTDOOR_MIN_F` / `OUTDOOR_MAX_F` | `-20` / `120` |
 | `WIND_MIN_MPH` / `WIND_MAX_MPH` | `0` / `40` |
 | `OUTPUT_PATH` | `/output/maverick-temperature.png` |
