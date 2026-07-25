@@ -24,7 +24,9 @@ scales (mixing them onto one shared axis would misrepresent the data):
   icon and `MAVERICK_START_NOTE` label are placed at
   `(MAVERICK_START_AT, MAVERICK_START_TEMP_F)` to mark the beginning of a
   cook — it naturally scrolls out of the panel once it falls outside
-  `LOOKBACK_HOURS`.
+  `LOOKBACK_HOURS`. The panel also shows a running "Smoke Duration" (`HH:MM`
+  since `MAVERICK_START_AT`) in the lower right — unlike the start icon, this
+  keeps counting even after the icon itself has scrolled out of view.
 - **Outdoor temperature** — Acurite-5n1's `temperature_F` field (already
   Fahrenheit), fixed `OUTDOOR_MIN_F`–`OUTDOOR_MAX_F` (default -20–120).
 - **Wind speed** — Acurite-5n1's `wind_avg_km_h` field converted to mph, fixed

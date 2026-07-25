@@ -150,7 +150,8 @@ def plot_panel(ax, title, times, values, color, value_fmt, min_value, max_value)
     style_axis(ax)
 
 
-def build_figure(meat, outdoor, wind, window_start):
+def build_figure(meat, outdoor, wind, now):
+    window_start = now - datetime.timedelta(hours=LOOKBACK_HOURS)
     fig, (ax_meat, ax_outdoor, ax_wind) = plt.subplots(
         3, 1, figsize=(10, 11), dpi=150, sharex=True,
     )
@@ -180,6 +181,19 @@ def build_figure(meat, outdoor, wind, window_start):
             xy=(START_AT, MAVERICK_START_TEMP_F),
             xytext=(8, 8), textcoords="offset points",
             fontsize=9, fontweight="bold", color="#0b0b0b",
+        )
+    if START_AT is not None and now >= START_AT:
+        duration_minutes = int((now - START_AT).total_seconds() // 60)
+        hours, minutes = divmod(duration_minutes, 60)
+        ax_meat.text(
+            0.99, 0.18, "Smoke Duration",
+            transform=ax_meat.transAxes, ha="right", va="bottom",
+            fontsize=8, color="#52514e",
+        )
+        ax_meat.text(
+            0.99, 0.03, f"{hours:02d}:{minutes:02d}",
+            transform=ax_meat.transAxes, ha="right", va="bottom",
+            fontsize=18, fontweight="bold", color="#0b0b0b",
         )
 
     plot_panel(
@@ -234,8 +248,8 @@ def main():
     outdoor = extract_series(acurite_rows, "temperature_F")
     wind = extract_series(acurite_rows, "wind_avg_km_h", kmh_to_mph)
 
-    window_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=LOOKBACK_HOURS)
-    fig = build_figure(meat, outdoor, wind, window_start)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    fig = build_figure(meat, outdoor, wind, now)
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     fig.savefig(OUTPUT_PATH, facecolor=fig.get_facecolor())
