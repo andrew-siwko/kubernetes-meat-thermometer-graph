@@ -50,13 +50,13 @@ spec:
             - name: GRAPH_MAX_F
               value: "250"
             - name: OUTDOOR_MIN_F
-              value: "-20"
+              value: "50"
             - name: OUTDOOR_MAX_F
-              value: "120"
+              value: "100"
             - name: WIND_MIN_MPH
               value: "0"
             - name: WIND_MAX_MPH
-              value: "40"
+              value: "10"
             - name: OUTPUT_PATH
               value: /output/maverick-temperature.png
             - name: SCP_HOST
