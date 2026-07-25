@@ -6,7 +6,7 @@ metadata:
   labels:
     app: meat-thermometer-graph
 spec:
-  schedule: "*/10 * * * *"
+  schedule: "* * * * *"
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -43,6 +43,10 @@ spec:
               value: Maverick-ET73
             - name: LOOKBACK_HOURS
               value: "8"
+            - name: GRAPH_MIN_F
+              value: "0"
+            - name: GRAPH_MAX_F
+              value: "250"
             - name: OUTPUT_PATH
               value: /output/maverick-temperature.png
             volumeMounts:
