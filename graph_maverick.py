@@ -67,14 +67,25 @@ def parse_rows(rows):
     return series
 
 
+def find_latest(series):
+    # (device_id, timestamp, fahrenheit) of whichever device has the newest point
+    latest = None
+    for device_id, (times, temps) in series.items():
+        if times and (latest is None or times[-1] > latest[1]):
+            latest = (device_id, times[-1], temps[-1])
+    return latest
+
+
 def plot_series(series):
     fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
     fig.patch.set_facecolor("#fcfcfb")
     ax.set_facecolor("#fcfcfb")
 
     multiple_devices = len(series) > 1
+    device_colors = {}
     for device_index, (device_id, (times, temps)) in enumerate(series.items()):
         color = SERIES_COLORS[device_index % len(SERIES_COLORS)]
+        device_colors[device_id] = color
         label = f"id {device_id}" if multiple_devices else None
         ax.plot(
             times,
@@ -83,6 +94,35 @@ def plot_series(series):
             linewidth=2,
             solid_capstyle="round",
             label=label,
+        )
+
+    latest = find_latest(series)
+    if latest is not None:
+        latest_device, latest_ts, latest_temp = latest
+        ax.scatter(
+            [latest_ts],
+            [latest_temp],
+            color=device_colors[latest_device],
+            s=36,
+            zorder=5,
+            edgecolor="#fcfcfb",
+            linewidth=1,
+        )
+        ax.text(
+            0.99, 0.97,
+            f"{latest_temp:.1f}°F",
+            transform=ax.transAxes,
+            ha="right", va="top",
+            fontsize=22, fontweight="bold",
+            color="#0b0b0b",
+        )
+        ax.text(
+            0.99, 0.88,
+            f"as of {latest_ts:%Y-%m-%d %H:%M:%S}",
+            transform=ax.transAxes,
+            ha="right", va="top",
+            fontsize=9,
+            color="#52514e",
         )
 
     ax.set_title(
