@@ -7,10 +7,10 @@ the last 8 hours and publishes it as a PNG.
 
 `graph_maverick.py` queries the `sdr433` Postgres database's `all_readings`
 table for `Maverick-ET73` rows from the last `LOOKBACK_HOURS` (default 8),
-converts each probe's Celsius reading to Fahrenheit, and renders a line chart
-(Probe 1 / Probe 2) to `OUTPUT_PATH` (default `/output/maverick-temperature.png`).
-If no readings are found in the window, the previous PNG is left in place
-rather than overwritten.
+converts probe 1's Celsius reading to Fahrenheit, and renders a line chart
+(fixed `GRAPH_MIN_F`–`GRAPH_MAX_F` y-axis, default 0–250) to `OUTPUT_PATH`
+(default `/output/maverick-temperature.png`). If no readings are found in the
+window, the previous PNG is left in place rather than overwritten.
 
 ## Pieces
 
@@ -34,6 +34,7 @@ rather than overwritten.
 | `PGUSER` / `PGPASSWORD`              | from `sdr433-role-credentials` secret                              |
 | `MAVERICK_MODEL`                     | `Maverick-ET73`                                                    |
 | `LOOKBACK_HOURS`                     | `8`                                                                |
+| `GRAPH_MIN_F` / `GRAPH_MAX_F`        | `0` / `250`                                                        |
 | `OUTPUT_PATH`                        | `/output/maverick-temperature.png`                                 |
 
 ## Viewing the graph
