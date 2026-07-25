@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: meat-thermometer-graph
+  namespace: default
+  labels:
+    app: meat-thermometer-graph
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: meat-thermometer-graph
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/arch: amd64
+          containers:
+          - name: meat-thermometer-graph
+            image: kregistry.siwko.org:5000/meat-thermometer-graph:latest
+            imagePullPolicy: Always
+            env:
+            - name: PGHOST
+              value: prod-postgres-rw.default.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: sdr433
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: sdr433-role-credentials
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sdr433-role-credentials
+                  key: password
+            - name: MAVERICK_MODEL
+              value: Maverick-ET73
+            - name: LOOKBACK_HOURS
+              value: "8"
+            - name: OUTPUT_PATH
+              value: /output/maverick-temperature.png
+            volumeMounts:
+            - name: graph-output
+              mountPath: /output
+          volumes:
+          - name: graph-output
+            persistentVolumeClaim:
+              claimName: meat-thermometer-graph-pvc

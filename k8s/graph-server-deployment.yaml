@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meat-thermometer-graph-server
+  namespace: default
+  labels:
+    app: meat-thermometer-graph-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meat-thermometer-graph-server
+  template:
+    metadata:
+      labels:
+        app: meat-thermometer-graph-server
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: graph-output
+          mountPath: /usr/share/nginx/html
+          readOnly: true
+      volumes:
+      - name: graph-output
+        persistentVolumeClaim:
+          claimName: meat-thermometer-graph-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meat-thermometer-graph-service
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30002
+  selector:
+    app: meat-thermometer-graph-server
