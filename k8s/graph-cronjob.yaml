@@ -44,7 +44,7 @@ spec:
             - name: ACURITE_MODEL
               value: Acurite-5n1
             - name: LOOKBACK_HOURS
-              value: "6"
+              value: "12"
             - name: GRAPH_MIN_F
               value: "0"
             - name: GRAPH_MAX_F
