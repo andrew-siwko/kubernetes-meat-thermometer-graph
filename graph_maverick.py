@@ -78,7 +78,7 @@ def extract_series(rows, field, transform=lambda value: value):
 
         if field not in payload:
             continue
-        times.append(timestamp)
+        times.append(timestamp.replace(tzinfo=datetime.timezone.utc))
         values.append(transform(payload[field]))
 
     return times, values
@@ -110,7 +110,7 @@ def plot_panel(ax, title, times, values, color, value_fmt, min_value, max_value)
             transform=ax.transAxes, ha="right", va="top",
             fontsize=18, fontweight="bold", color="#0b0b0b",
         )
-        latest_ts_eastern = latest_ts.replace(tzinfo=datetime.timezone.utc).astimezone(DISPLAY_TZ)
+        latest_ts_eastern = latest_ts.astimezone(DISPLAY_TZ)
         ax.text(
             0.99, 0.80, f"as of {latest_ts_eastern:%Y-%m-%d %H:%M:%S %Z}",
             transform=ax.transAxes, ha="right", va="top",
@@ -151,7 +151,7 @@ def build_figure(meat, outdoor, wind):
         COLOR_WIND, "{:.1f} mph", WIND_MIN_MPH, WIND_MAX_MPH,
     )
     ax_wind.set_ylabel("mph", color="#52514e")
-    ax_wind.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax_wind.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=DISPLAY_TZ))
 
     fig.autofmt_xdate()
     fig.suptitle(f"Last {LOOKBACK_HOURS}h", color="#0b0b0b", fontsize=10, x=0.01, ha="left")
